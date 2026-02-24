@@ -41,11 +41,18 @@ $ cargo install --git https://github.com/AtleSkaanes/cfg-fuzzer.git
 - [ ] Add custom term declarations
 - [x] Range support to CFG
 - [ ] Fix comments
-- [ ] Lexer errors
+- [ ] Add documentation for CFG syntax
+- [ ] Fix inconsistent spacing between generated strings
+    - [ ] Decide the rule for spacing
 - [ ] More robust syntax and errors
+    - [ ] Lexer errors
     - [ ] Error on no ';' after last rule
-    - [ ] Show actual row and column
+    - [ ] Show actual row and column in error message
 - [ ] Set up tests
     - [ ] Lexer tests
     - [ ] Parser tests
     - [ ] Generation tests
+- [ ] Metadata
+    - [ ] Set probability in ors
+    - [ ] Set number of repititions
+    - [ ] Set 'no-space'
