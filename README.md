@@ -41,3 +41,4 @@ $ cargo install --git https://github.com/AtleSkaanes/cfg-fuzzer.git
 - [ ] Add custom term declarations
 - [x] Range support to CFG
 - [ ] Fix comments
+- [ ] Lexer errors
