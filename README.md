@@ -11,7 +11,7 @@ So this may not work for languages where there is a tight relationship between t
 
 ## USAGE
 
-To use this program, first create a CFG file (docs for syntax is further down [[##CFG-SYNTAX]]), then call the program, with the CFG file as an argument. You also need to specify the starting rule with the `--start` flag.
+To use this program, first create a CFG file (docs for syntax is further down), then call the program, with the CFG file as an argument. You also need to specify the starting rule with the `--start` flag.
 An example is:
 ```sh
 $ cfg-fuzzer c.cfg --start code
@@ -42,3 +42,10 @@ $ cargo install --git https://github.com/AtleSkaanes/cfg-fuzzer.git
 - [x] Range support to CFG
 - [ ] Fix comments
 - [ ] Lexer errors
+- [ ] More robust syntax and errors
+    - [ ] Error on no ';' after last rule
+    - [ ] Show actual row and column
+- [ ] Set up tests
+    - [ ] Lexer tests
+    - [ ] Parser tests
+    - [ ] Generation tests
