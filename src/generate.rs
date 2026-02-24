@@ -93,7 +93,6 @@ fn generate_from_letter(
                     None => choices.push(range.from),
                 }
             }
-            // eprintln!("GOT RANGE: {:?} ({:?})", choices, ranges);
             let ch = choices.choose(rng).unwrap_or(&' ');
             out.push(*ch);
         }

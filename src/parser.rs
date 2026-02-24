@@ -15,6 +15,8 @@ pub enum ParseError {
     UnexpectedOp(LexerCtx, Operator),
     #[error("{0} -> Got range operator '-' without left hand side argument")]
     UnexpectedRange(LexerCtx),
+    #[error("{0} -> Got invalid range '{1}'")]
+    InvalidRange(LexerCtx, CfgRange),
     #[error("{0} -> Got unexpected EOF")]
     GotEof(LexerCtx),
 }
@@ -129,14 +131,24 @@ fn parse_letter(lex: &mut Lexer) -> Result<Option<CfgLetter>, ParseError> {
                 }
             }
             Operator::OpenRange => {
-                // TODO: Make this cleaner
                 let mut ranges = vec![];
                 let mut range_from = None;
                 let mut needs_rhs = false;
 
-                let mut shift_char = |ref mut nrhs, ch, ctx| {
+                let is_related = |first: char, second: char| {
+                    first.is_numeric() == second.is_numeric()
+                        && first.is_lowercase() == second.is_lowercase()
+                        && first <= second
+                        && first.is_alphanumeric()
+                        && second.is_alphanumeric()
+                };
+
+                let mut shift_char = |nrhs: &mut _, ch, ctx| {
                     if *nrhs {
                         if let Some(prev) = range_from {
+                            if !is_related(prev, ch) {
+                                return Err(ParseError::InvalidRange(ctx, CfgRange::new(prev, ch)));
+                            }
                             ranges.push(CfgRange::new(prev, ch));
                         } else {
                             return Err(ParseError::UnexpectedRange(ctx));
@@ -145,6 +157,12 @@ fn parse_letter(lex: &mut Lexer) -> Result<Option<CfgLetter>, ParseError> {
                         *nrhs = false;
                     } else {
                         if let Some(prev) = range_from {
+                            if !prev.is_alphanumeric() {
+                                return Err(ParseError::InvalidRange(
+                                    ctx,
+                                    CfgRange::new_single(prev),
+                                ));
+                            }
                             ranges.push(CfgRange::new_single(prev))
                         }
                         range_from = Some(ch);
@@ -162,28 +180,13 @@ fn parse_letter(lex: &mut Lexer) -> Result<Option<CfgLetter>, ParseError> {
                         }
                         Token::Num(num) => {
                             for digit in num.to_string().chars() {
-                                shift_char(needs_rhs, digit, lex.ctx.clone())?
+                                shift_char(&mut needs_rhs, digit, lex.ctx.clone())?
                             }
                         }
-                        Token::String(ref str) => {
-                            if str.len() != 1 {
-                                return Err(ParseError::UnexpectedToken(
-                                    lex.ctx.clone(),
-                                    "single letter or digit".into(),
-                                    token,
-                                ));
+                        Token::String(str) | Token::Ident(str) => {
+                            for ch in str.chars() {
+                                shift_char(&mut needs_rhs, ch, lex.ctx.clone())?
                             }
-                            shift_char(needs_rhs, str.chars().next().unwrap(), lex.ctx.clone())?
-                        }
-                        Token::Ident(ref ident) => {
-                            if ident.len() != 1 {
-                                return Err(ParseError::UnexpectedToken(
-                                    lex.ctx.clone(),
-                                    "single letter or digit".into(),
-                                    token,
-                                ));
-                            }
-                            shift_char(needs_rhs, ident.chars().next().unwrap(), lex.ctx.clone())?
                         }
                         _ => {}
                     }

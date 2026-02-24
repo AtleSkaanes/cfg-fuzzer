@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use std::{collections::HashMap, fmt::Display};
 
 #[derive(Clone, Debug)]
 pub struct Cfg {
@@ -41,5 +41,14 @@ impl CfgRange {
 
     pub fn new_single(ch: char) -> Self {
         Self { from: ch, to: None }
+    }
+}
+
+impl Display for CfgRange {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self.to {
+            Some(to) => write!(f, "{}-{}", self.from, to),
+            None => write!(f, "{}", self.from),
+        }
     }
 }
