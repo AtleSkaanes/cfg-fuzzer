@@ -35,3 +35,9 @@ $ cargo install --git https://github.com/AtleSkaanes/cfg-fuzzer.git
 ## CFG-SYNTAX
 
 **🚧 UNDER CONSTRUCTION 🚧**
+
+## ROADMAP
+- [ ] Limit recursion/depth of generation
+- [ ] Add custom term declarations
+- [x] Range support to CFG
+- [ ] Fix comments

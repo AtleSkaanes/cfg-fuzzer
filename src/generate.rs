@@ -81,6 +81,22 @@ fn generate_from_letter(
                 generate_from_letter(cfg, ltr, out, rng)?;
             }
         }
+        CfgLetter::Range(ranges) => {
+            let mut choices = vec![];
+            for range in ranges {
+                match range.to {
+                    Some(to) => {
+                        for ch in range.from..=to {
+                            choices.push(ch)
+                        }
+                    }
+                    None => choices.push(range.from),
+                }
+            }
+            // eprintln!("GOT RANGE: {:?} ({:?})", choices, ranges);
+            let ch = choices.choose(rng).unwrap_or(&' ');
+            out.push(*ch);
+        }
         CfgLetter::Term(term) => {
             let str: &str = &term.clone().into_string();
             out.push(' ');

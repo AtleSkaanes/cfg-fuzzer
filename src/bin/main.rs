@@ -8,6 +8,11 @@ fn main() -> std::io::Result<()> {
 
     let src = open_file(args.grammar.clone())?;
 
+    // let lex = Lexer::new(&src, &args.grammar);
+    // for (i, tok) in lex.enumerate() {
+    //     println!("[{}]: {:?}", i, tok);
+    // }
+
     let ast = match parse(&src, &args.grammar) {
         Ok(ast) => ast,
         Err(e) => {

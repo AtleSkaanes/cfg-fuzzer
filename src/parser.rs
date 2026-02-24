@@ -3,7 +3,7 @@ use std::collections::HashMap;
 use thiserror::Error;
 
 use crate::{
-    cfg::{Cfg, CfgLetter, CfgRule},
+    cfg::{Cfg, CfgLetter, CfgRange, CfgRule},
     lexer::{Lexer, LexerCtx, Operator, Token},
 };
 
@@ -13,6 +13,8 @@ pub enum ParseError {
     UnexpectedToken(LexerCtx, Box<str>, Token),
     #[error("{0} -> Got unexpected operator {1:?}")]
     UnexpectedOp(LexerCtx, Operator),
+    #[error("{0} -> Got range operator '-' without left hand side argument")]
+    UnexpectedRange(LexerCtx),
     #[error("{0} -> Got unexpected EOF")]
     GotEof(LexerCtx),
 }
@@ -109,7 +111,6 @@ fn parse_letter(lex: &mut Lexer) -> Result<Option<CfgLetter>, ParseError> {
                         _ => {}
                     }
 
-                    // Unwrap because we know its not None due to last match
                     match parse_letter(lex)? {
                         Some(CfgLetter::Or(or)) => {
                             letters.push(or[0][0].clone());
@@ -127,9 +128,77 @@ fn parse_letter(lex: &mut Lexer) -> Result<Option<CfgLetter>, ParseError> {
                     CfgLetter::Group([CfgLetter::Or(ors.into())].into())
                 }
             }
+            Operator::OpenRange => {
+                // TODO: Make this cleaner
+                let mut ranges = vec![];
+                let mut range_from = None;
+                let mut needs_rhs = false;
+
+                let mut shift_char = |ref mut nrhs, ch, ctx| {
+                    if *nrhs {
+                        if let Some(prev) = range_from {
+                            ranges.push(CfgRange::new(prev, ch));
+                        } else {
+                            return Err(ParseError::UnexpectedRange(ctx));
+                        }
+                        range_from = None;
+                        *nrhs = false;
+                    } else {
+                        if let Some(prev) = range_from {
+                            ranges.push(CfgRange::new_single(prev))
+                        }
+                        range_from = Some(ch);
+                    }
+                    Ok(())
+                };
+
+                while let Some(token) = lex.next() {
+                    match token {
+                        Token::Op(Operator::CloseRange) => {
+                            break;
+                        }
+                        Token::Op(Operator::RangeTo) => {
+                            needs_rhs = true;
+                        }
+                        Token::Num(num) => {
+                            for digit in num.to_string().chars() {
+                                shift_char(needs_rhs, digit, lex.ctx.clone())?
+                            }
+                        }
+                        Token::String(ref str) => {
+                            if str.len() != 1 {
+                                return Err(ParseError::UnexpectedToken(
+                                    lex.ctx.clone(),
+                                    "single letter or digit".into(),
+                                    token,
+                                ));
+                            }
+                            shift_char(needs_rhs, str.chars().next().unwrap(), lex.ctx.clone())?
+                        }
+                        Token::Ident(ref ident) => {
+                            if ident.len() != 1 {
+                                return Err(ParseError::UnexpectedToken(
+                                    lex.ctx.clone(),
+                                    "single letter or digit".into(),
+                                    token,
+                                ));
+                            }
+                            shift_char(needs_rhs, ident.chars().next().unwrap(), lex.ctx.clone())?
+                        }
+                        _ => {}
+                    }
+                }
+
+                if let Some(ch) = range_from {
+                    ranges.push(CfgRange::new_single(ch))
+                }
+
+                CfgLetter::Range(ranges.into())
+            }
             _ => return Err(ParseError::UnexpectedOp(lex.ctx.clone(), op)),
         },
         Some(Token::String(str)) => CfgLetter::StrLit(str),
+        Some(Token::Num(num)) => CfgLetter::StrLit(num.to_string().into()),
         None => return Ok(None),
     };
 
@@ -152,7 +221,13 @@ fn parse_letter(lex: &mut Lexer) -> Result<Option<CfgLetter>, ParseError> {
                 letter = CfgLetter::Or(Box::new([Box::new([letter])]));
                 break;
             }
-            Operator::Eol | Operator::RuleDeclare | Operator::OpenParen | Operator::CloseParen => {
+            Operator::Eol
+            | Operator::RuleDeclare
+            | Operator::OpenParen
+            | Operator::CloseParen
+            | Operator::OpenRange
+            | Operator::CloseRange
+            | Operator::RangeTo => {
                 break;
             }
         }

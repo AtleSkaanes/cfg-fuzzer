@@ -23,6 +23,23 @@ pub enum CfgLetter {
     OneOrMore(Box<CfgLetter>),
     /// A group of letters, denoted by surrounding it in ( )
     Group(Box<[CfgLetter]>),
+    Range(Box<[CfgRange]>),
     /// A terminating value
     Term(Box<str>),
+}
+
+#[derive(Clone, Debug)]
+pub struct CfgRange {
+    pub from: char,
+    pub to: Option<char>,
+}
+
+impl CfgRange {
+    pub fn new(from: char, to: char) -> Self {
+        Self { from, to: Some(to) }
+    }
+
+    pub fn new_single(ch: char) -> Self {
+        Self { from: ch, to: None }
+    }
 }

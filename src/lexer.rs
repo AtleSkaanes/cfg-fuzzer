@@ -60,6 +60,23 @@ impl std::iter::Iterator for Lexer {
                 continue;
             }
 
+            if self.src[self.index].is_numeric() {
+                let start_idx = self.index;
+                while self.src[self.index].is_numeric() {
+                    self.index += 1;
+                }
+                let num: usize = match &self.src[start_idx..self.index]
+                    .iter()
+                    .collect::<String>()
+                    .parse()
+                {
+                    Ok(n) => *n,
+                    Err(_) => return None,
+                };
+
+                return Some(Token::Num(num));
+            }
+
             // String
             if self.src[self.index] == '"' || self.src[self.index] == '\'' {
                 let delim = self.src[self.index];
@@ -95,6 +112,9 @@ impl std::iter::Iterator for Lexer {
                 '|' => Some(Operator::Pipe),
                 '(' => Some(Operator::OpenParen),
                 ')' => Some(Operator::CloseParen),
+                '[' => Some(Operator::OpenRange),
+                ']' => Some(Operator::CloseRange),
+                '-' => Some(Operator::RangeTo),
                 ':' => Some(Operator::RuleDeclare),
                 ';' => Some(Operator::Eol),
                 _ => None,
@@ -133,6 +153,9 @@ pub enum Operator {
     Pipe,
     OpenParen,
     CloseParen,
+    OpenRange,
+    CloseRange,
+    RangeTo,
     RuleDeclare,
     Eol,
 }
@@ -140,6 +163,7 @@ pub enum Operator {
 #[derive(Clone, Debug)]
 pub enum Token {
     String(Box<str>),
+    Num(usize),
     Ident(Box<str>),
     Op(Operator),
 }
