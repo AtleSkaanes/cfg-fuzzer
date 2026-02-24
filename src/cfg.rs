@@ -13,7 +13,7 @@ pub enum CfgLetter {
     Rule(Box<str>),
     /// String literal
     StrLit(Box<str>),
-    /// TODO: Better comment: A binop that matches either lhs or rhs, denoted by the | operator
+    /// A chain of options, where only one will be evaluated, denoted by the | operator
     Or(Box<[Box<[CfgLetter]>]>),
     /// An optional letter, denoted by the ? suffix
     Optional(Box<CfgLetter>),
