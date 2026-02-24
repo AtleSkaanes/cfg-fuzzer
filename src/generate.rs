@@ -87,8 +87,8 @@ fn generate_from_letter(
             match str {
                 "IDENT" => {
                     let idents = [
-                        "foo", "bar", "baz", "foobar", "var", "x", "y", "a", "b", "node", "item",
-                        "elem", "i", "index", "str", "out", "buf", "ptr",
+                        "foo", "bar", "baz", "foobar", "x", "y", "a", "b", "node", "item", "elem",
+                        "i", "index", "str", "out", "buf", "ptr", "get", "set",
                     ];
                     out.push_str(idents.choose(rng).unwrap_or(&"foo"));
                     while rng.random_bool(0.20) {
