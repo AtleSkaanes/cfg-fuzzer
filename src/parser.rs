@@ -17,11 +17,17 @@ pub enum ParseError {
     UnexpectedRange(LexerCtx),
     #[error("{0} -> Got invalid range '{1}'")]
     InvalidRange(LexerCtx, CfgRange),
+    #[error("Term '{0}' is not valid. The syntax is 'TERM_NAME:VAL'")]
+    InvalidTerm(Box<str>),
+    #[error("Term '{0}' depends on the a rule. A term can only consit of terminal values")]
+    TermRecurse(Box<str>),
+    #[error("Term '{0}' defined multiple times")]
+    TermDupe(Box<str>),
     #[error("{0} -> Got unexpected EOF")]
     GotEof(LexerCtx),
 }
 
-pub fn parse(src: &str, filename: &str) -> Result<Cfg, ParseError> {
+pub fn parse(src: &str, filename: &str, terms: &[String]) -> Result<Cfg, ParseError> {
     let mut lex = Lexer::new(src, filename);
 
     let mut map = HashMap::new();
@@ -54,7 +60,33 @@ pub fn parse(src: &str, filename: &str) -> Result<Cfg, ParseError> {
         map.insert(ident.clone(), rules.unwrap());
     }
 
-    Ok(Cfg { rules: map })
+    let mut terms_map = HashMap::new();
+    for term in terms {
+        let Some((term_ident, term_str)) = term.split_once(':') else {
+            return Err(ParseError::InvalidTerm(term.clone().into_boxed_str()));
+        };
+
+        let mut lex = Lexer::new(term_str, term_ident);
+
+        let Some(term_rule) = parse_rule(&mut lex)? else {
+            return Err(ParseError::InvalidTerm(term.clone().into_boxed_str()));
+        };
+
+        for ltr in &term_rule {
+            if !is_valid_term(ltr) {
+                return Err(ParseError::TermRecurse(term_ident.into()));
+            }
+        }
+
+        if terms_map.insert(term_ident.into(), term_rule).is_some() {
+            return Err(ParseError::TermDupe(term_ident.into()));
+        };
+    }
+
+    Ok(Cfg {
+        rules: map,
+        terms: terms_map,
+    })
 }
 
 fn parse_rule(lex: &mut Lexer) -> Result<Option<CfgRule>, ParseError> {
@@ -246,4 +278,34 @@ fn is_uppercase(str: &str) -> bool {
         }
     }
     true
+}
+
+fn is_valid_term(letter: &CfgLetter) -> bool {
+    match letter {
+        CfgLetter::Rule(_) | CfgLetter::Term(_) => false,
+        CfgLetter::StrLit(_) => true,
+        CfgLetter::Or(items) => {
+            for rule in items {
+                for ltr in rule {
+                    if !is_valid_term(ltr) {
+                        return false;
+                    }
+                }
+            }
+            true
+        }
+        CfgLetter::Optional(ltr) => is_valid_term(ltr),
+
+        CfgLetter::Many(ltr) => is_valid_term(ltr),
+        CfgLetter::OneOrMore(ltr) => is_valid_term(ltr),
+        CfgLetter::Group(items) => {
+            for ltr in items {
+                if !is_valid_term(ltr) {
+                    return false;
+                }
+            }
+            true
+        }
+        CfgLetter::Range(_) => true,
+    }
 }

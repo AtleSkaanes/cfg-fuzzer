@@ -3,6 +3,7 @@ use std::{collections::HashMap, fmt::Display};
 #[derive(Clone, Debug)]
 pub struct Cfg {
     pub rules: HashMap<Box<str>, CfgRule>,
+    pub terms: HashMap<Box<str>, CfgRule>,
 }
 
 pub type CfgRule = Box<[CfgLetter]>;

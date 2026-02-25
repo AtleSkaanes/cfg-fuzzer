@@ -8,7 +8,7 @@ fn main() -> std::io::Result<()> {
 
     let src = open_file(args.grammar.clone())?;
 
-    let ast = match parse(&src, &args.grammar) {
+    let ast = match parse(&src, &args.grammar, &args.terms.into_boxed_slice()) {
         Ok(ast) => ast,
         Err(e) => {
             eprintln!("err: {}", e);

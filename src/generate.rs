@@ -11,6 +11,8 @@ pub enum GenerateError {
         "Unknown starting rule '{0}'. The starting rule needs to be declared as any other rule."
     )]
     UnknownStart(Box<str>),
+    #[error("Unknown term '{0}'. You can define it with -T=\"{0}:RULE\"")]
+    UnknownTerm(Box<str>),
 }
 
 pub fn generate_code(
@@ -97,6 +99,13 @@ fn generate_from_letter(
             out.push(*ch);
         }
         CfgLetter::Term(term) => {
+            if let Some(term_rule) = cfg.terms.get(term) {
+                for r in term_rule {
+                    generate_from_letter(cfg, r, out, rng)?;
+                }
+                return Ok(());
+            }
+
             let str: &str = &term.clone().into_string();
             out.push(' ');
             match str {
@@ -139,7 +148,7 @@ fn generate_from_letter(
                 }
                 "NEWLINE" | "NL" => out.push('\n'),
                 "TAB" => out.push('\t'),
-                _ => panic!("UNKNOWN TERM: '{}'", str),
+                _ => return Err(GenerateError::UnknownTerm(term.clone())),
             }
         }
     }

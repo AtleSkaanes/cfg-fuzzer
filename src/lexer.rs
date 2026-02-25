@@ -97,7 +97,7 @@ impl std::iter::Iterator for Lexer {
             if is_ident_start(self.src[self.index]) {
                 let start_idx = self.index;
 
-                while is_ident(self.src[self.index]) {
+                while self.index < self.src.len() && is_ident(self.src[self.index]) {
                     self.index += 1;
                 }
 
