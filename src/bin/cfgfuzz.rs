@@ -34,7 +34,7 @@ fn main() -> std::io::Result<()> {
     let generated = match generate_code(ast, &args.start, &mut rand::rng()) {
         Ok(g) => g,
         Err(e) => {
-            eprintln!("{}io err{}: {}", RED, CLEAR, e);
+            eprintln!("{}err{}: {}", RED, CLEAR, e);
             std::process::exit(1);
         }
     };

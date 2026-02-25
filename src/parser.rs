@@ -27,7 +27,7 @@ pub enum ParseError {
     GotEof(LexerCtx),
 }
 
-pub fn parse(src: &str, filename: &str, terms: &[String]) -> Result<Cfg, ParseError> {
+pub fn parse(src: &str, filename: &str, terms: &[Box<str>]) -> Result<Cfg, ParseError> {
     let mut lex = Lexer::new(src, filename);
 
     let mut map = HashMap::new();
@@ -63,13 +63,13 @@ pub fn parse(src: &str, filename: &str, terms: &[String]) -> Result<Cfg, ParseEr
     let mut terms_map = HashMap::new();
     for term in terms {
         let Some((term_ident, term_str)) = term.split_once(':') else {
-            return Err(ParseError::InvalidTerm(term.clone().into_boxed_str()));
+            return Err(ParseError::InvalidTerm(term.clone()));
         };
 
         let mut lex = Lexer::new(term_str, term_ident);
 
         let Some(term_rule) = parse_rule(&mut lex)? else {
-            return Err(ParseError::InvalidTerm(term.clone().into_boxed_str()));
+            return Err(ParseError::InvalidTerm(term.clone()));
         };
 
         for ltr in &term_rule {
