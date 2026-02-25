@@ -40,7 +40,7 @@ $ cargo install --git https://github.com/AtleSkaanes/cfg-fuzzer.git
 - [ ] Limit recursion/depth of generation
 - [x] Add custom term declarations
 - [x] Range support to CFG
-- [ ] Fix comments
+- [ ] Fix comments in CFG
 - [ ] Add documentation for CFG syntax
 - [ ] Fix inconsistent spacing between generated strings
     - [ ] Decide the rule for spacing
@@ -56,3 +56,4 @@ $ cargo install --git https://github.com/AtleSkaanes/cfg-fuzzer.git
     - [ ] Set probability in ors
     - [ ] Set number of repititions
     - [ ] Set 'no-space'
+- [ ] Add examples of CFG's
