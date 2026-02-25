@@ -99,6 +99,8 @@ fn generate_from_letter(
             out.push(*ch);
         }
         CfgLetter::Term(term) => {
+            out.push(' ');
+
             if let Some(term_rule) = cfg.terms.get(term) {
                 for r in term_rule {
                     generate_from_letter(cfg, r, out, rng)?;
@@ -107,7 +109,6 @@ fn generate_from_letter(
             }
 
             let str: &str = &term.clone().into_string();
-            out.push(' ');
             match str {
                 "IDENT" => {
                     let idents = [

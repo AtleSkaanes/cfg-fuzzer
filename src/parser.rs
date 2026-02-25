@@ -189,7 +189,7 @@ fn parse_letter(lex: &mut Lexer) -> Result<Option<CfgLetter>, ParseError> {
                         *nrhs = false;
                     } else {
                         if let Some(prev) = range_from {
-                            if !prev.is_alphanumeric() {
+                            if !(prev.is_alphanumeric() || prev == '_') {
                                 return Err(ParseError::InvalidRange(
                                     ctx,
                                     CfgRange::new_single(prev),
