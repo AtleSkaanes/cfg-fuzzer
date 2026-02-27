@@ -37,7 +37,7 @@ pub fn parse(src: &str, filename: &str, terms: &[Box<str>]) -> Result<Cfg, Parse
             Token::Ident(ref ident) => ident,
             _ => {
                 return Err(ParseError::UnexpectedToken(
-                    lex.ctx,
+                    lex.ctx(),
                     "identifier".into(),
                     tok,
                 ));
@@ -45,11 +45,11 @@ pub fn parse(src: &str, filename: &str, terms: &[Box<str>]) -> Result<Cfg, Parse
         };
 
         let Some(tok) = lex.next() else {
-            return Err(ParseError::GotEof(lex.ctx.clone()));
+            return Err(ParseError::GotEof(lex.ctx()));
         };
 
         if !matches!(tok, Token::Op(Operator::RuleDeclare)) {
-            return Err(ParseError::UnexpectedToken(lex.ctx, "':'".into(), tok));
+            return Err(ParseError::UnexpectedToken(lex.ctx(), "':'".into(), tok));
         }
 
         if matches!(lex.peek_next(), Some(Token::Op(Operator::Pipe))) {
@@ -141,7 +141,7 @@ fn parse_letter(lex: &mut Lexer) -> Result<Option<CfgLetter>, ParseError> {
                             let _ = lex.next();
                             break;
                         }
-                        None => return Err(ParseError::GotEof(lex.ctx.clone())),
+                        None => return Err(ParseError::GotEof(lex.ctx())),
                         _ => {}
                     }
 
@@ -151,7 +151,7 @@ fn parse_letter(lex: &mut Lexer) -> Result<Option<CfgLetter>, ParseError> {
                             ors.push(std::mem::take(&mut letters).into());
                         }
                         Some(ltr) => letters.push(ltr),
-                        None => return Err(ParseError::GotEof(lex.ctx.clone())),
+                        None => return Err(ParseError::GotEof(lex.ctx())),
                     }
                 }
 
@@ -212,12 +212,12 @@ fn parse_letter(lex: &mut Lexer) -> Result<Option<CfgLetter>, ParseError> {
                         }
                         Token::Num(num) => {
                             for digit in num.to_string().chars() {
-                                shift_char(&mut needs_rhs, digit, lex.ctx.clone())?
+                                shift_char(&mut needs_rhs, digit, lex.ctx())?
                             }
                         }
                         Token::String(str) | Token::Ident(str) => {
                             for ch in str.chars() {
-                                shift_char(&mut needs_rhs, ch, lex.ctx.clone())?
+                                shift_char(&mut needs_rhs, ch, lex.ctx())?
                             }
                         }
                         _ => {}
@@ -230,7 +230,7 @@ fn parse_letter(lex: &mut Lexer) -> Result<Option<CfgLetter>, ParseError> {
 
                 CfgLetter::Range(ranges.into())
             }
-            _ => return Err(ParseError::UnexpectedOp(lex.ctx.clone(), op)),
+            _ => return Err(ParseError::UnexpectedOp(lex.ctx(), op)),
         },
         Some(Token::String(str)) => CfgLetter::StrLit(str),
         Some(Token::Num(num)) => CfgLetter::StrLit(num.to_string().into()),

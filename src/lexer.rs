@@ -1,5 +1,5 @@
 pub struct Lexer {
-    pub ctx: LexerCtx,
+    file: Box<str>,
     src: Box<[char]>,
     index: usize,
 }
@@ -8,11 +8,7 @@ impl Lexer {
     pub fn new(src: &str, filename: &str) -> Self {
         let src_string = src.to_owned();
         Self {
-            ctx: LexerCtx {
-                line: 1,
-                column: 1,
-                file: filename.into(),
-            },
+            file: filename.into(),
             src: src_string.chars().collect(),
             index: 0,
         }
@@ -25,6 +21,28 @@ impl Lexer {
 
         token
     }
+
+    pub fn ctx(&self) -> LexerCtx {
+        let mut column = 1;
+        let mut line = 1;
+
+        let mut idx = 0;
+        while idx < self.index {
+            if self.src[idx] == '\n' {
+                line += 1;
+                column = 1;
+            } else {
+                column += 1;
+            }
+            idx += 1;
+        }
+
+        LexerCtx {
+            line,
+            column,
+            file: self.file.clone(),
+        }
+    }
 }
 
 impl std::iter::Iterator for Lexer {
@@ -36,7 +54,6 @@ impl std::iter::Iterator for Lexer {
                 while self.src[self.index] != '\n' {
                     self.index += 1;
                 }
-                break;
             }
             // if self.index < self.src.len() + 1
             //     && matches!(
@@ -52,10 +69,6 @@ impl std::iter::Iterator for Lexer {
             // }
 
             if self.src[self.index].is_whitespace() {
-                if self.src[self.index] == '\n' {
-                    self.ctx.column = 1;
-                    self.ctx.line += 1;
-                }
                 self.index += 1;
                 continue;
             }
@@ -141,7 +154,7 @@ pub struct LexerCtx {
 
 impl std::fmt::Display for LexerCtx {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}:{}:{}", self.file, self.line, self.column)
+        write!(f, "[{}:{}:{}]", self.file, self.line, self.column)
     }
 }
 
