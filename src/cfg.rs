@@ -2,28 +2,46 @@ use std::{collections::HashMap, fmt::Display};
 
 #[derive(Clone, Debug)]
 pub struct Cfg {
-    pub rules: HashMap<Box<str>, CfgRule>,
+    letters: Box<[CfgLetter]>,
+    pub top_level: CfgRule,
     pub terms: HashMap<Box<str>, CfgRule>,
 }
 
-pub type CfgRule = Box<[CfgLetter]>;
+impl Cfg {
+    pub fn new(letters: Box<[CfgLetter]>, top_level: CfgRule, terms: HashMap<Box<str>, CfgRule>) -> Self {
+        Cfg { letters, top_level, terms }
+    }
+
+    /// Get the slice of letters, which `rule` refers to.
+    pub fn rule_slice(&self, rule: &CfgRule) -> &[CfgLetter] {
+        &self.letters[rule.0 .. rule.1]
+    }
+
+    pub fn get_letter(&self, id: usize) -> &CfgLetter {
+        &self.letters[id]
+    }
+}
+
+/// A grouped list of letters
+pub type CfgRule = (usize, usize);
+pub type CfgTermID = u16;
 
 #[derive(Clone, Debug)]
 pub enum CfgLetter {
     /// A reference to another rule
-    Rule(Box<str>),
+    Rule(CfgRule),
     /// String literal
     StrLit(Box<str>),
     /// A chain of options, where only one will be evaluated, denoted by the | operator
-    Or(Box<[Box<[CfgLetter]>]>),
+    Or(Box<[CfgRule]>),
     /// An optional letter, denoted by the ? suffix
-    Optional(Box<CfgLetter>),
+    Optional(usize),
     /// An arbitrary amount of repitions, denoted by the * suffix
-    Many(Box<CfgLetter>),
+    Many(usize),
     /// An arbitrary amount of repitions, denoted by the + suffix
-    OneOrMore(Box<CfgLetter>),
+    OneOrMore(usize),
     /// A group of letters, denoted by surrounding it in ( )
-    Group(Box<[CfgLetter]>),
+    Group(CfgRule),
     Range(Box<[CfgRange]>),
     /// A terminating value
     Term(Box<str>),

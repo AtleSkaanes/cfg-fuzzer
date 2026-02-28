@@ -9,6 +9,10 @@ use crate::{
 
 #[derive(Error, Debug)]
 pub enum ParseError {
+    #[error("Top level declaration not found, no rule with name '{0}'")]
+    NoTopLevelDeclaration(Box<str>),
+    #[error("Rule {0} referenced but not defined")]
+    UndefinedRule(Box<str>),
     #[error("{0} -> Expected {1} but got {2:?}")]
     UnexpectedToken(LexerCtx, Box<str>, Token),
     #[error("{0} -> Got unexpected operator {1:?}")]
@@ -27,10 +31,43 @@ pub enum ParseError {
     GotEof(LexerCtx),
 }
 
-pub fn parse(src: &str, filename: &str, terms: &[Box<str>]) -> Result<Cfg, ParseError> {
-    let mut lex = Lexer::new(src, filename);
+use MaybeUnknown::*;
+enum MaybeUnknown {
+    /// The letter is known
+    Known(CfgLetter),
+    /// The letter is a reference to another rule, which must be retrieved later
+    Unknown(Box<str>),
+}
 
-    let mut map = HashMap::new();
+impl MaybeUnknown {
+    /// Tries to become a known rule.
+    /// Returns `Some` if value is known, or found in `map`.
+    /// Returns `None` if value is unknown and not found in `map`
+    ///
+    /// If the value was fetched from the map, the result will always have variant
+    /// `CfgLetter::Rule`
+    pub fn into_letter(self, map: &HashMap<Box<str>, CfgRule>) -> Result<CfgLetter, ParseError> {
+        match self {
+            Known(l) => Ok(l),
+            Unknown(name) => map
+                .get(&name)
+                .map(|rule| CfgLetter::Rule(*rule))
+                .ok_or(ParseError::UndefinedRule(name)),
+        }
+    }
+}
+
+pub fn parse(
+    src: &str,
+    filename: &str,
+    terms: &[Box<str>],
+    top_level: &str,
+) -> Result<Cfg, ParseError> {
+    let mut lex = Lexer::new(src, filename);
+    let mut maybes: Vec<MaybeUnknown> = vec![];
+
+    // All CfgRules with names attached for reference
+    let mut map: HashMap<Box<str>, CfgRule> = HashMap::new();
 
     while let Some(tok) = lex.next() {
         let ident = match tok {
@@ -53,14 +90,15 @@ pub fn parse(src: &str, filename: &str, terms: &[Box<str>]) -> Result<Cfg, Parse
         }
 
         if matches!(lex.peek_next(), Some(Token::Op(Operator::Pipe))) {
-            let _ = lex.next();
+            _ = lex.next();
         }
 
-        let rules = parse_rule(&mut lex)?;
-        map.insert(ident.clone(), rules.unwrap());
+        let rules = parse_rule(&mut lex, &mut maybes)?;
+
+        map.insert(ident.clone(), rules);
     }
 
-    let mut terms_map = HashMap::new();
+    let mut terms_map: HashMap<Box<str>, (usize, usize)> = HashMap::new();
     for term in terms {
         let Some((term_ident, term_str)) = term.split_once(':') else {
             return Err(ParseError::InvalidTerm(term.clone()));
@@ -68,40 +106,48 @@ pub fn parse(src: &str, filename: &str, terms: &[Box<str>]) -> Result<Cfg, Parse
 
         let mut lex = Lexer::new(term_str, term_ident);
 
-        let Some(term_rule) = parse_rule(&mut lex)? else {
-            return Err(ParseError::InvalidTerm(term.clone()));
-        };
+        let term_rule = parse_rule(&mut lex, &mut maybes)?;
 
-        for ltr in &term_rule {
-            if !is_valid_term(ltr) {
+        for id in term_rule.0..term_rule.1 {
+            if !is_valid_term(id, &maybes) {
                 return Err(ParseError::TermRecurse(term_ident.into()));
             }
         }
 
-        if terms_map.insert(term_ident.into(), term_rule).is_some() {
+        if terms_map.contains_key(term_ident) {
             return Err(ParseError::TermDupe(term_ident.into()));
-        };
+        }
+
+        let begin = maybes.len();
+        terms_map.insert(term_ident.into(), (begin, maybes.len()));
     }
 
-    Ok(Cfg {
-        rules: map,
-        terms: terms_map,
-    })
+    let tld_rule_pos = match map.get(top_level) {
+        Some(rule_pos) => *rule_pos,
+        None => return Err(ParseError::NoTopLevelDeclaration(top_level.into())),
+    };
+
+    let letters: Result<Box<[CfgLetter]>, ParseError> = maybes
+        .into_iter()
+        .map(|maybe| maybe.into_letter(&map))
+        .collect();
+
+    Ok(Cfg::new(letters?, tld_rule_pos, terms_map))
 }
 
-fn parse_rule(lex: &mut Lexer) -> Result<Option<CfgRule>, ParseError> {
-    let mut letters = vec![];
+fn parse_rule(lex: &mut Lexer, letters: &mut Vec<MaybeUnknown>) -> Result<CfgRule, ParseError> {
     let mut ors = vec![];
+    let mut begin = letters.len();
     loop {
         // Unwrap because we know its not None due to last match
         if matches!(lex.peek_next(), Some(Token::Op(Operator::Eol))) {
-            _ = lex.next();
+            lex.next();
             break;
         }
-        match parse_letter(lex)? {
-            Some(CfgLetter::Or(or)) => {
-                letters.push(or[0][0].clone());
-                ors.push(std::mem::take(&mut letters).into());
+        match parse_letter(lex, letters)? {
+            Some(Known(CfgLetter::Or(..))) => {
+                ors.push((begin, letters.len()));
+                begin = letters.len();
             }
             Some(ltr) => letters.push(ltr),
             None => break,
@@ -109,58 +155,64 @@ fn parse_rule(lex: &mut Lexer) -> Result<Option<CfgRule>, ParseError> {
     }
 
     if !ors.is_empty() {
-        ors.push(std::mem::take(&mut letters).into());
-        letters.push(CfgLetter::Or(ors.into()))
+        ors.push((begin, letters.len()));
+        begin = letters.len();
+        letters.push(Known(CfgLetter::Or(ors.into())))
     }
 
-    Ok(Some(letters.into()))
+    Ok((begin, letters.len()))
 }
 
-fn parse_letter(lex: &mut Lexer) -> Result<Option<CfgLetter>, ParseError> {
-    match lex.peek_next() {
-        Some(_) => {}
-        // None => return Err(ParseError::GotEof(lex.ctx.clone())),
-        None => return Ok(None),
-    }
+fn parse_letter(
+    lex: &mut Lexer,
+    letters: &mut Vec<MaybeUnknown>,
+) -> Result<Option<MaybeUnknown>, ParseError> {
+    // match lex.peek_next() {
+    //     Some(_) => {}
+    //     // None => return Err(ParseError::GotEof(lex.ctx.clone())),
+    //     None => return Ok(None),
+    // }
 
     let mut letter = match lex.next() {
         Some(Token::Ident(ident)) => {
             if is_uppercase(&ident) {
-                CfgLetter::Term(ident)
+                Known(CfgLetter::Term(ident))
             } else {
-                CfgLetter::Rule(ident)
+                Unknown(ident)
             }
         }
         Some(Token::Op(op)) => match op {
+            Operator::Pipe => Known(CfgLetter::Or(Box::new([]))),
             Operator::OpenParen => {
-                let mut letters = vec![];
+                let mut begin = letters.len();
                 let mut ors = vec![];
                 loop {
                     match lex.peek_next() {
                         Some(Token::Op(Operator::CloseParen)) => {
-                            let _ = lex.next();
+                            lex.next();
                             break;
                         }
                         None => return Err(ParseError::GotEof(lex.ctx.clone())),
                         _ => {}
                     }
 
-                    match parse_letter(lex)? {
-                        Some(CfgLetter::Or(or)) => {
-                            letters.push(or[0][0].clone());
-                            ors.push(std::mem::take(&mut letters).into());
+                    match parse_letter(lex, letters)? {
+                        Some(Known(CfgLetter::Or(..))) => {
+                            ors.push((begin, letters.len()));
+                            begin = letters.len();
                         }
                         Some(ltr) => letters.push(ltr),
                         None => return Err(ParseError::GotEof(lex.ctx.clone())),
                     }
                 }
 
-                if ors.is_empty() {
-                    CfgLetter::Group(letters.into())
-                } else {
-                    ors.push(std::mem::take(&mut letters).into());
-                    CfgLetter::Group([CfgLetter::Or(ors.into())].into())
+                if !ors.is_empty() {
+                    ors.push((begin, letters.len()));
+                    begin = letters.len();
+                    letters.push(Known(CfgLetter::Or(ors.into())))
                 }
+
+                Known(CfgLetter::Group((begin, letters.len())))
             }
             Operator::OpenRange => {
                 let mut ranges = vec![];
@@ -228,33 +280,34 @@ fn parse_letter(lex: &mut Lexer) -> Result<Option<CfgLetter>, ParseError> {
                     ranges.push(CfgRange::new_single(ch))
                 }
 
-                CfgLetter::Range(ranges.into())
+                Known(CfgLetter::Range(ranges.into()))
             }
             _ => return Err(ParseError::UnexpectedOp(lex.ctx.clone(), op)),
         },
-        Some(Token::String(str)) => CfgLetter::StrLit(str),
-        Some(Token::Num(num)) => CfgLetter::StrLit(num.to_string().into()),
+        Some(Token::String(str)) => Known(CfgLetter::StrLit(str)),
+        Some(Token::Num(num)) => Known(CfgLetter::StrLit(num.to_string().into())),
         None => return Ok(None),
     };
 
     while let Some(Token::Op(op)) = lex.peek_next() {
         match op {
             Operator::Star => {
-                let _ = lex.next();
-                letter = CfgLetter::Many(Box::new(letter))
+                lex.next();
+                let idx = letters.len();
+                letters.push(letter);
+                letter = Known(CfgLetter::Many(idx))
             }
             Operator::Plus => {
-                let _ = lex.next();
-                letter = CfgLetter::OneOrMore(Box::new(letter))
+                lex.next();
+                let idx = letters.len();
+                letters.push(letter);
+                letter = Known(CfgLetter::OneOrMore(idx))
             }
             Operator::QuestionMark => {
-                let _ = lex.next();
-                letter = CfgLetter::Optional(Box::new(letter))
-            }
-            Operator::Pipe => {
-                let _ = lex.next();
-                letter = CfgLetter::Or(Box::new([Box::new([letter])]));
-                break;
+                lex.next();
+                let idx = letters.len();
+                letters.push(letter);
+                letter = Known(CfgLetter::Optional(idx))
             }
             Operator::Eol
             | Operator::RuleDeclare
@@ -262,6 +315,7 @@ fn parse_letter(lex: &mut Lexer) -> Result<Option<CfgLetter>, ParseError> {
             | Operator::CloseParen
             | Operator::OpenRange
             | Operator::CloseRange
+            | Operator::Pipe
             | Operator::RangeTo => {
                 break;
             }
@@ -280,32 +334,22 @@ fn is_uppercase(str: &str) -> bool {
     true
 }
 
-fn is_valid_term(letter: &CfgLetter) -> bool {
+fn is_valid_term(id: usize, maybes: &Vec<MaybeUnknown>) -> bool {
+    let Known(letter) = &maybes[id] else {
+        return false;
+    };
     match letter {
         CfgLetter::Rule(_) | CfgLetter::Term(_) => false,
         CfgLetter::StrLit(_) => true,
-        CfgLetter::Or(items) => {
-            for rule in items {
-                for ltr in rule {
-                    if !is_valid_term(ltr) {
-                        return false;
-                    }
-                }
-            }
-            true
-        }
-        CfgLetter::Optional(ltr) => is_valid_term(ltr),
+        CfgLetter::Or(items) => items
+            .iter()
+            .flat_map(|rule| rule.0..rule.1)
+            .all(|maybe| is_valid_term(maybe, maybes)),
 
-        CfgLetter::Many(ltr) => is_valid_term(ltr),
-        CfgLetter::OneOrMore(ltr) => is_valid_term(ltr),
-        CfgLetter::Group(items) => {
-            for ltr in items {
-                if !is_valid_term(ltr) {
-                    return false;
-                }
-            }
-            true
-        }
+        CfgLetter::Optional(id) => is_valid_term(*id, maybes),
+        CfgLetter::Many(id) => is_valid_term(*id, maybes),
+        CfgLetter::OneOrMore(id) => is_valid_term(*id, maybes),
+        CfgLetter::Group(items) => (items.0..items.1).all(|maybe| is_valid_term(maybe, maybes)),
         CfgLetter::Range(_) => true,
     }
 }
