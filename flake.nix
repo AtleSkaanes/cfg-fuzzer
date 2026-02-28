@@ -22,16 +22,18 @@
       devShells = forEachSystem (pkgs: {
         default = pkgs.callPackage (
           {
-            mkShellNoCC,
+            mkShell,
             cargo,
+            rustc,
           }:
-          mkShellNoCC {
+          mkShell {
             strictDeps = true;
             packages = [
               cargo
+              rustc
             ];
           }
-        ) { };
+        ) { mkShell = pkgs.mkShell.override { inherit (pkgs.llvmPackages) stdenv; }; };
       });
     };
 }
