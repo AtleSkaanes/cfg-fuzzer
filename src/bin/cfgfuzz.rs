@@ -23,7 +23,7 @@ fn main() -> std::io::Result<()> {
         }
     };
 
-    let ast = match parse(&src, &args.grammar, &args.terms.into_boxed_slice()) {
+    let ast = match parse(&src, &args.grammar, &args.terms.into_boxed_slice(), &args.start) {
         Ok(ast) => ast,
         Err(e) => {
             eprintln!("{}err{}: {}", RED, CLEAR, e);
@@ -31,7 +31,7 @@ fn main() -> std::io::Result<()> {
         }
     };
 
-    let generated = match generate_code(ast, &args.start, &mut rand::rng()) {
+    let generated = match generate_code(ast, &mut rand::rng()) {
         Ok(g) => g,
         Err(e) => {
             eprintln!("{}err{}: {}", RED, CLEAR, e);

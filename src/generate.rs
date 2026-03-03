@@ -3,30 +3,20 @@ use thiserror::Error;
 
 use crate::cfg::{Cfg, CfgLetter};
 
+// TODO: Remove GenerateError, as Terms should also be parsed properly in the parser
 #[derive(Error, Debug)]
 pub enum GenerateError {
-    #[error("Encountered unknown rule '{0}'")]
-    UnknownRule(Box<str>),
-    #[error(
-        "Unknown starting rule '{0}'. The starting rule needs to be declared as any other rule."
-    )]
-    UnknownStart(Box<str>),
     #[error("Unknown term '{0}'. You can define it with -T=\"{0}:RULE\"")]
     UnknownTerm(Box<str>),
 }
 
 pub fn generate_code(
     cfg: Cfg,
-    start: &str,
     rng: &mut dyn rand::Rng,
 ) -> Result<Box<str>, GenerateError> {
     let mut code = String::new();
 
-    let Some(rule) = cfg.rules.get(start) else {
-        return Err(GenerateError::UnknownStart(start.into()));
-    };
-
-    for r in rule {
+    for r in cfg.rule_slice(&cfg.top_level) {
         generate_from_letter(&cfg, r, &mut code, rng)?;
     }
 
@@ -40,11 +30,8 @@ fn generate_from_letter(
     rng: &mut dyn rand::Rng,
 ) -> Result<(), GenerateError> {
     match ltr {
-        CfgLetter::Rule(ident) => {
-            let Some(rule) = cfg.rules.get(ident) else {
-                return Err(GenerateError::UnknownRule(ident.clone()));
-            };
-            for r in rule {
+        CfgLetter::Rule(rule) => {
+            for r in cfg.rule_slice(rule) {
                 generate_from_letter(cfg, r, out, rng)?;
             }
         }
@@ -57,29 +44,29 @@ fn generate_from_letter(
                 return Ok(());
             };
 
-            for r in rule {
+            for r in cfg.rule_slice(rule) {
                 generate_from_letter(cfg, r, out, rng)?;
             }
         }
-        CfgLetter::Optional(cfg_letter) => {
+        CfgLetter::Optional(id) => {
             if rng.random_bool(0.50) {
-                generate_from_letter(cfg, cfg_letter, out, rng)?;
+                generate_from_letter(cfg, cfg.get_letter(*id), out, rng)?;
             }
         }
-        CfgLetter::Many(cfg_letter) => {
+        CfgLetter::Many(id) => {
             while rng.random_bool(0.50) {
-                generate_from_letter(cfg, cfg_letter, out, rng)?;
+                generate_from_letter(cfg, cfg.get_letter(*id), out, rng)?;
             }
         }
-        CfgLetter::OneOrMore(cfg_letter) => {
-            generate_from_letter(cfg, cfg_letter, out, rng)?;
+        CfgLetter::OneOrMore(id) => {
+            generate_from_letter(cfg, cfg.get_letter(*id), out, rng)?;
 
             while rng.random_bool(0.50) {
-                generate_from_letter(cfg, cfg_letter, out, rng)?;
+                generate_from_letter(cfg, cfg.get_letter(*id), out, rng)?;
             }
         }
-        CfgLetter::Group(letters) => {
-            for ltr in letters {
+        CfgLetter::Group(group) => {
+            for ltr in cfg.rule_slice(group) {
                 generate_from_letter(cfg, ltr, out, rng)?;
             }
         }
@@ -102,7 +89,7 @@ fn generate_from_letter(
             out.push(' ');
 
             if let Some(term_rule) = cfg.terms.get(term) {
-                for r in term_rule {
+                for r in cfg.rule_slice(term_rule) {
                     generate_from_letter(cfg, r, out, rng)?;
                 }
                 return Ok(());
