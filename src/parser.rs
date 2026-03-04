@@ -31,7 +31,7 @@ pub enum ParseError {
     GotEof(LexerCtx),
 }
 
-use MaybeUnknown::*;
+use MaybeUnknown::{Known, Unknown};
 enum MaybeUnknown {
     /// The letter is known
     Known(CfgLetter),
@@ -70,15 +70,12 @@ pub fn parse(
     let mut map: HashMap<Box<str>, CfgRule> = HashMap::new();
 
     while let Some(tok) = lex.next() {
-        let ident = match tok {
-            Token::Ident(ref ident) => ident,
-            _ => {
-                return Err(ParseError::UnexpectedToken(
-                    lex.ctx(),
-                    "identifier".into(),
-                    tok,
-                ));
-            }
+        let Token::Ident(ident) = tok else {
+            return Err(ParseError::UnexpectedToken(
+                lex.ctx(),
+                "identifier".into(),
+                tok,
+            ));
         };
 
         let Some(tok) = lex.next() else {
@@ -157,7 +154,7 @@ fn parse_rule(lex: &mut Lexer, letters: &mut Vec<MaybeUnknown>) -> Result<CfgRul
     if !ors.is_empty() {
         ors.push((begin, letters.len()));
         begin = letters.len();
-        letters.push(Known(CfgLetter::Or(ors.into())))
+        letters.push(Known(CfgLetter::Or(ors.into())));
     }
 
     Ok((begin, letters.len()))
@@ -209,7 +206,7 @@ fn parse_letter(
                 if !ors.is_empty() {
                     ors.push((begin, letters.len()));
                     begin = letters.len();
-                    letters.push(Known(CfgLetter::Or(ors.into())))
+                    letters.push(Known(CfgLetter::Or(ors.into())));
                 }
 
                 Known(CfgLetter::Group((begin, letters.len())))
@@ -247,7 +244,7 @@ fn parse_letter(
                                     CfgRange::new_single(prev),
                                 ));
                             }
-                            ranges.push(CfgRange::new_single(prev))
+                            ranges.push(CfgRange::new_single(prev));
                         }
                         range_from = Some(ch);
                     }
@@ -264,20 +261,20 @@ fn parse_letter(
                         }
                         Token::Num(num) => {
                             for digit in num.to_string().chars() {
-                                shift_char(&mut needs_rhs, digit, lex.ctx())?
+                                shift_char(&mut needs_rhs, digit, lex.ctx())?;
                             }
                         }
                         Token::String(str) | Token::Ident(str) => {
                             for ch in str.chars() {
-                                shift_char(&mut needs_rhs, ch, lex.ctx())?
+                                shift_char(&mut needs_rhs, ch, lex.ctx())?;
                             }
                         }
-                        _ => {}
+                        Token::Op(_) => {}
                     }
                 }
 
                 if let Some(ch) = range_from {
-                    ranges.push(CfgRange::new_single(ch))
+                    ranges.push(CfgRange::new_single(ch));
                 }
 
                 Known(CfgLetter::Range(ranges.into()))
@@ -295,19 +292,19 @@ fn parse_letter(
                 lex.next();
                 let idx = letters.len();
                 letters.push(letter);
-                letter = Known(CfgLetter::Many(idx))
+                letter = Known(CfgLetter::Many(idx));
             }
             Operator::Plus => {
                 lex.next();
                 let idx = letters.len();
                 letters.push(letter);
-                letter = Known(CfgLetter::OneOrMore(idx))
+                letter = Known(CfgLetter::OneOrMore(idx));
             }
             Operator::QuestionMark => {
                 lex.next();
                 let idx = letters.len();
                 letters.push(letter);
-                letter = Known(CfgLetter::Optional(idx))
+                letter = Known(CfgLetter::Optional(idx));
             }
             Operator::Eol
             | Operator::RuleDeclare
@@ -340,16 +337,15 @@ fn is_valid_term(id: usize, maybes: &Vec<MaybeUnknown>) -> bool {
     };
     match letter {
         CfgLetter::Rule(_) | CfgLetter::Term(_) => false,
-        CfgLetter::StrLit(_) => true,
+        CfgLetter::StrLit(_) | CfgLetter::Range(_) => true,
         CfgLetter::Or(items) => items
             .iter()
             .flat_map(|rule| rule.0..rule.1)
             .all(|maybe| is_valid_term(maybe, maybes)),
 
-        CfgLetter::Optional(id) => is_valid_term(*id, maybes),
-        CfgLetter::Many(id) => is_valid_term(*id, maybes),
-        CfgLetter::OneOrMore(id) => is_valid_term(*id, maybes),
+        CfgLetter::Optional(id) | CfgLetter::Many(id) | CfgLetter::OneOrMore(id) => {
+            is_valid_term(*id, maybes)
+        }
         CfgLetter::Group(items) => (items.0..items.1).all(|maybe| is_valid_term(maybe, maybes)),
-        CfgLetter::Range(_) => true,
     }
 }

@@ -10,14 +10,11 @@ pub enum GenerateError {
     UnknownTerm(Box<str>),
 }
 
-pub fn generate_code(
-    cfg: Cfg,
-    rng: &mut dyn rand::Rng,
-) -> Result<Box<str>, GenerateError> {
+pub fn generate_code(cfg: &Cfg, rng: &mut dyn rand::Rng) -> Result<Box<str>, GenerateError> {
     let mut code = String::new();
 
     for r in cfg.rule_slice(&cfg.top_level) {
-        generate_from_letter(&cfg, r, &mut code, rng)?;
+        generate_from_letter(cfg, r, &mut code, rng)?;
     }
 
     Ok(code.into_boxed_str())
@@ -76,7 +73,7 @@ fn generate_from_letter(
                 match range.to {
                     Some(to) => {
                         for ch in range.from..=to {
-                            choices.push(ch)
+                            choices.push(ch);
                         }
                     }
                     None => choices.push(range.from),
@@ -105,7 +102,7 @@ fn generate_from_letter(
                     out.push_str(idents.choose(rng).unwrap_or(&"foo"));
                     while rng.random_bool(0.20) {
                         out.push('_');
-                        out.push_str(idents.choose(rng).unwrap_or(&"foo"))
+                        out.push_str(idents.choose(rng).unwrap_or(&"foo"));
                     }
                 }
                 "CAPS_IDENT" => {
@@ -113,7 +110,7 @@ fn generate_from_letter(
                     out.push_str(idents.choose(rng).unwrap_or(&"FOO"));
                     while rng.random_bool(0.20) {
                         out.push('_');
-                        out.push_str(idents.choose(rng).unwrap_or(&"FOO"))
+                        out.push_str(idents.choose(rng).unwrap_or(&"FOO"));
                     }
                 }
                 "TYPE_IDENT" => {
@@ -122,17 +119,17 @@ fn generate_from_letter(
                     ];
                     out.push_str(idents.choose(rng).unwrap_or(&"foo"));
                     while rng.random_bool(0.20) {
-                        out.push_str(idents.choose(rng).unwrap_or(&"foo"))
+                        out.push_str(idents.choose(rng).unwrap_or(&"foo"));
                     }
                 }
                 "NUMBER" => {
                     let number: f64 = rng.random();
                     let rounded = (number * 100.0).round() / 100.0;
-                    out.push_str(&rounded.to_string())
+                    out.push_str(&rounded.to_string());
                 }
                 "INT" => {
                     let int: u8 = rng.random();
-                    out.push_str(&int.to_string())
+                    out.push_str(&int.to_string());
                 }
                 "NEWLINE" | "NL" => out.push('\n'),
                 "TAB" => out.push('\t'),

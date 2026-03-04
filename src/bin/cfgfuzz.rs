@@ -36,7 +36,7 @@ fn main() {
         }
     };
 
-    let generated = match generate_code(ast, &mut rand::rng()) {
+    let generated = match generate_code(&ast, &mut rand::rng()) {
         Ok(g) => g,
         Err(e) => {
             eprintln!("{}err{}: {}", RED, CLEAR, e);

@@ -5,6 +5,7 @@ pub struct Lexer {
 }
 
 impl Lexer {
+    #[must_use]
     pub fn new(src: &str, filename: &str) -> Self {
         let src_string = src.to_owned();
         Self {
@@ -22,6 +23,7 @@ impl Lexer {
         token
     }
 
+    #[must_use]
     pub fn ctx(&self) -> LexerCtx {
         let mut column = 1;
         let mut line = 1;
@@ -99,7 +101,7 @@ impl std::iter::Iterator for Lexer {
                     if self.src[self.index] == '\\' {
                         self.index += 2;
                     } else {
-                        self.index += 1
+                        self.index += 1;
                     }
                 }
                 let str: String = self.src[start_idx..self.index].iter().collect();

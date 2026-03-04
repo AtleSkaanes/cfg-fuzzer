@@ -8,15 +8,26 @@ pub struct Cfg {
 }
 
 impl Cfg {
-    pub fn new(letters: Box<[CfgLetter]>, top_level: CfgRule, terms: HashMap<Box<str>, CfgRule>) -> Self {
-        Cfg { letters, top_level, terms }
+    #[must_use]
+    pub fn new(
+        letters: Box<[CfgLetter]>,
+        top_level: CfgRule,
+        terms: HashMap<Box<str>, CfgRule>,
+    ) -> Self {
+        Cfg {
+            letters,
+            top_level,
+            terms,
+        }
     }
 
     /// Get the slice of letters, which `rule` refers to.
+    #[must_use]
     pub fn rule_slice(&self, rule: &CfgRule) -> &[CfgLetter] {
-        &self.letters[rule.0 .. rule.1]
+        &self.letters[rule.0..rule.1]
     }
 
+    #[must_use]
     pub fn get_letter(&self, id: usize) -> &CfgLetter {
         &self.letters[id]
     }
@@ -54,10 +65,12 @@ pub struct CfgRange {
 }
 
 impl CfgRange {
+    #[must_use]
     pub fn new(from: char, to: char) -> Self {
         Self { from, to: Some(to) }
     }
 
+    #[must_use]
     pub fn new_single(ch: char) -> Self {
         Self { from: ch, to: None }
     }
