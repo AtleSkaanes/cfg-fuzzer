@@ -9,7 +9,7 @@ use clap::Parser;
 const RED: &str = "\x1b[31m";
 const CLEAR: &str = "\x1b[0m";
 
-fn main() -> std::io::Result<()> {
+fn main() {
     let args = cliargs::Args::parse();
 
     let src = match open_file(&args.grammar) {
@@ -19,15 +19,20 @@ fn main() -> std::io::Result<()> {
                 "{}err{}: While opening '{}': {}",
                 RED, CLEAR, args.grammar, e
             );
-            std::process::exit(1);
+            std::process::exit(1)
         }
     };
 
-    let ast = match parse(&src, &args.grammar, &args.terms.into_boxed_slice(), &args.start) {
+    let ast = match parse(
+        &src,
+        &args.grammar,
+        &args.terms.into_boxed_slice(),
+        &args.start,
+    ) {
         Ok(ast) => ast,
         Err(e) => {
             eprintln!("{}err{}: {}", RED, CLEAR, e);
-            std::process::exit(1);
+            std::process::exit(1)
         }
     };
 
@@ -35,7 +40,7 @@ fn main() -> std::io::Result<()> {
         Ok(g) => g,
         Err(e) => {
             eprintln!("{}err{}: {}", RED, CLEAR, e);
-            std::process::exit(1);
+            std::process::exit(1)
         }
     };
 
@@ -47,8 +52,6 @@ fn main() -> std::io::Result<()> {
     } else {
         println!("{}", generated);
     }
-
-    Ok(())
 }
 
 fn open_file(path: &str) -> std::io::Result<Box<str>> {
