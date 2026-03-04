@@ -12,3 +12,4 @@ thiserror = "2.0.18"
 pedantic = { level = "warn", priority = -1 }
 style = { level = "warn", priority = -1 }
 uninlined_format_args = "allow"
+too_many_lines = "allow"

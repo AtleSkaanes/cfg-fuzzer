@@ -11,8 +11,8 @@ use crate::{
 pub enum ParseError {
     #[error("Top level declaration not found, no rule with name '{0}'")]
     NoTopLevelDeclaration(Box<str>),
-    #[error("Rule {0} referenced but not defined")]
-    UndefinedRule(Box<str>),
+    #[error("{0} -> Rule '{1}' referenced but not defined")]
+    UndefinedRule(LexerCtx, Box<str>),
     #[error("{0} -> Expected {1} but got {2:?}")]
     UnexpectedToken(LexerCtx, Box<str>, Token),
     #[error("{0} -> Got unexpected operator {1:?}")]
@@ -36,7 +36,7 @@ enum MaybeUnknown {
     /// The letter is known
     Known(CfgLetter),
     /// The letter is a reference to another rule, which must be retrieved later
-    Unknown(Box<str>),
+    Unknown { name: Box<str>, ctx: LexerCtx },
 }
 
 impl MaybeUnknown {
@@ -49,10 +49,10 @@ impl MaybeUnknown {
     pub fn into_letter(self, map: &HashMap<Box<str>, CfgRule>) -> Result<CfgLetter, ParseError> {
         match self {
             Known(l) => Ok(l),
-            Unknown(name) => map
+            Unknown { name, ctx } => map
                 .get(&name)
                 .map(|rule| CfgLetter::Rule(*rule))
-                .ok_or(ParseError::UndefinedRule(name)),
+                .ok_or(ParseError::UndefinedRule(ctx, name)),
         }
     }
 }
@@ -175,7 +175,10 @@ fn parse_letter(
             if is_uppercase(&ident) {
                 Known(CfgLetter::Term(ident))
             } else {
-                Unknown(ident)
+                Unknown {
+                    name: ident,
+                    ctx: lex.ctx(),
+                }
             }
         }
         Some(Token::Op(op)) => match op {
